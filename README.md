@@ -1,47 +1,37 @@
-# Me-Server
+# Cortex (formerly Me-Server)
 
-> **The API for your life.**
+**Cortex** is an Agentic Personal Operating System designed to proactively manage your digital life. Built with **FastAPI**, **LangGraph**, and **Next.js**, it features a multi-agent architecture capable of intelligent routing, system monitoring, and future RAG/Calendar integrations.
 
-Me-Server is a personal MCP (Model Context Protocol) server that exposes your current status, computer stats, and more to LLM agents. Instead of you working for your apps, make your apps work for you by giving them a standard way to query "How is [Name] doing?" or "Is the computer busy?".
+## 🚀 Quick Start
 
-## Vision
+1. **Install Dependencies**:
+   - Backend: `uv sync` (or `pip install -r requirements.txt`)
+   - Frontend: `cd frontend && npm install`
 
-The goal is to turn "You" into a resource that agents can query.
-- **Resources**: `me://status` (Are you in Deep Work? Free? Asleep?)
-- **Tools**: `update_status` (Let agents know what you're doing), `get_system_stats` (CPU/RAM usage).
+2. **Configure Environment**:
+   - Copy `.env.example` to `.env`.
+   - Set your LLM keys (OpenAI, Hugging Face, or Groq).
 
-## Quickstart
+3. **Launch Cortex**:
+   ```bash
+   chmod +x start_cortex.sh
+   ./start_cortex.sh
+   ```
+   - **Backend**: `http://localhost:8000`
+   - **Frontend**: `http://localhost:3000`
 
-### Prerequisites
-- [uv](https://github.com/astral-sh/uv) (Recommended)
-- Python 3.10+
+## 🧠 Architecture
 
-### Installation
+- **Supervisor Agent**: Routes requests using JSON-based reasoning (Model Agnostic).
+- **System Worker**: Monitor CPU, RAM, Battery using local tools (Manual ReAct Loop).
+- **Journal Worker**: (Coming Soon) RAG-based introspection.
+- **Calendar Worker**: (Coming Soon) Schedule management.
 
-```bash
-# Clone the repo
-git clone https://github.com/yourusername/me-server.git
-cd me-server
+## 🛠 Tech Stack
 
-# Install dependencies
-uv sync
-```
-
-### Running the Server
-
-To test locally with the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
-
-```bash
-npx @modelcontextprotocol/inspector uv run server.py
-```
-
-## Contributing
-
-We welcome contributions! This is an open-source project to build the standard "Personal API".
-1. Fork the repo.
-2. Create a feature branch.
-3. Submit a Pull Request.
+- **Backend**: Python, FastAPI, LangGraph, LangChain.
+- **Frontend**: TypeScript, Next.js, Tailwind CSS, shadcn/ui.
+- **LLM**: Agnostic (Tested with Llama-3-70B via Hugging Face & OpenAI).
 
 ## License
-
 MIT

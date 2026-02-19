@@ -173,3 +173,7 @@ __marimo__/
 
 # MCP
 state.json
+
+
+# Extra mds
+/extra_mds
