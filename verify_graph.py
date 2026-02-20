@@ -12,7 +12,12 @@ async def main():
         for key, value in event.items():
             print(f"Node: {key}")
             if "messages" in value:
-                print(f"Output: {value['messages'][-1].content[:100]}...")
+                msg = value["messages"][-1]
+                print(f"Output Type: {type(msg)}")
+                if hasattr(msg, "content"):
+                    print(f"Output: {msg.content}")
+                else:
+                    print(f"Output: {str(msg)}")
 
     # Test 2: General Query
     print("\nTest 2: 'Hello, who are you?'")

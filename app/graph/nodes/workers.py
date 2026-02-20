@@ -28,9 +28,12 @@ def system_worker_node(state):
     
     system_prompt = (
         "You are the System Worker. You have access to the following tools:\n" + tools_desc + "\n"
-        "To use a tool, output valid JSON with keys 'cortex_tool' (name) and 'args' (dict).\n"
-        "Example: {\"cortex_tool\": \"get_system_stats\", \"args\": {}}\n"
-        "If no tool is needed, just output your answer as text."
+        "To check system status, you MUST output valid JSON with keys 'cortex_tool' and 'args' inside a code block.\n"
+        "Example:\n"
+        "```json\n"
+        "{\"cortex_tool\": \"get_system_stats\", \"args\": {}}\n"
+        "```\n"
+        "Refuse to answer if it's not about system stats."
     )
     
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
@@ -45,15 +48,19 @@ def system_worker_node(state):
     
     try:
         import json
-        if "{" in content and "cortex_tool" in content:
-            # Extract JSON substring
-            start = content.find("{")
-            end = content.rfind("}") + 1
-            json_str = content[start:end]
+        import re
+        # Find JSON inside code block or raw
+        json_match = re.search(r'```json\n(.*?)\n```', content, re.DOTALL)
+        if not json_match:
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            
+        if json_match:
+            json_str = json_match.group(1) if '```' in json_match.group(0) else json_match.group(0)
             data = json.loads(json_str)
             tool_name = data.get("cortex_tool")
             tool_args = data.get("args", {})
-    except Exception:
+    except Exception as e:
+        print(f"JSON Parsing Error: {e}")
         pass
         
     # 3. Execute Tool if found
@@ -69,7 +76,7 @@ def system_worker_node(state):
         from langchain_core.messages import AIMessage
         follow_up_messages = messages + [
             AIMessage(content=content),
-            SystemMessage(content=f"Tool Output: {tool_output}")
+            SystemMessage(content=f"Tool Output: {tool_output}\n\nBased on this output, provide a concise human-readable answer to the user.")
         ]
         final_response = llm.invoke(follow_up_messages)
         return {"messages": [final_response]}
