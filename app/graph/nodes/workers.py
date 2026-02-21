@@ -1,6 +1,7 @@
 from langchain_core.messages import SystemMessage
 from app.core.llm import get_llm
 from app.tools.system import get_system_stats, get_process_list
+from app.tools.journal import search_journal
 
 def create_agent(llm, tools, system_prompt: str):
     """Helper to create an agent node."""
@@ -86,16 +87,57 @@ def system_worker_node(state):
 # --- Journal Worker ---
 def journal_worker_node(state):
     llm = get_llm()
-    # TODO: Add RAG tools here
-    tools = [] 
-    agent = create_agent(
-        llm,
-        tools,
-        "You are the Journal Worker. You have access to the user's personal journal and notes. "
-        "Use RAG tools to search for past entries or add new ones. "
-        "For now, just say 'Journal tools are not yet implemented'."
+    
+    tools_desc = "1. search_journal(query: str): Searches the user's private Markdown journal entries for past memories, work updates, thoughts, and plans."
+    system_prompt = (
+        "You are the Journal Worker. You have access to the following RAG tool:\n" + tools_desc + "\n"
+        "To search memories or notes, you MUST output valid JSON with keys 'cortex_tool' and 'args' inside a code block.\n"
+        "Example:\n"
+        "```json\n"
+        "{\"cortex_tool\": \"search_journal\", \"args\": {\"query\": \"what did I do today?\"}}\n"
+        "```\n"
+        "If you don't need to search, just answer normally based on your persona."
     )
-    return agent(state)
+    
+    messages = [SystemMessage(content=system_prompt)] + state["messages"]
+    
+    response = llm.invoke(messages)
+    content = response.content.strip()
+    
+    tool_name = None
+    tool_args = {}
+    
+    try:
+        import json
+        import re
+        json_match = re.search(r'```json\n(.*?)\n```', content, re.DOTALL)
+        if not json_match:
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            
+        if json_match:
+            json_str = json_match.group(1) if '```' in json_match.group(0) else json_match.group(0)
+            data = json.loads(json_str)
+            tool_name = data.get("cortex_tool")
+            tool_args = data.get("args", {})
+    except Exception as e:
+        print(f"Journal JSON Parsing Error: {e}")
+        pass
+        
+    if tool_name == "search_journal":
+        try:
+            tool_output = search_journal.invoke(tool_args)
+        except Exception as e:
+            tool_output = f"Tool search_journal failed: {e}"
+            
+        from langchain_core.messages import AIMessage
+        follow_up_messages = messages + [
+            AIMessage(content=content),
+            SystemMessage(content=f"Tool Output (Retrieved Context): {tool_output}\n\nBased on this retrieved memory, provide a concise human-readable answer to the user.")
+        ]
+        final_response = llm.invoke(follow_up_messages)
+        return {"messages": [final_response]}
+        
+    return {"messages": [response]}
 
 # --- Calendar Worker ---
 def calendar_worker_node(state):
