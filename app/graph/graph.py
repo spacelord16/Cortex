@@ -19,8 +19,7 @@ workflow.add_node("GeneralWorker", general_worker_node)
 system_tools = [get_system_stats, get_process_list]
 workflow.add_node("SystemTools", ToolNode(system_tools))
 
-# Edges: Supervisor -> Workers
-# The supervisor output "next" key determines where to go
+# Supervisor routes to a worker (one-shot — no loop back)
 conditional_map = {
     "SystemWorker": "SystemWorker",
     "JournalWorker": "JournalWorker",
@@ -30,18 +29,19 @@ conditional_map = {
 }
 workflow.add_conditional_edges("Supervisor", lambda x: x["next"], conditional_map)
 
-# Edges: Workers -> Tools or Supervisor
-workflow.add_edge("SystemTools", "SystemWorker") # Tools return output to Worker
-workflow.add_edge("JournalWorker", "Supervisor") 
-workflow.add_edge("CalendarWorker", "Supervisor") 
-workflow.add_edge("GeneralWorker", "Supervisor")
+# Workers go directly to END — no loop back to Supervisor
+# This prevents the Supervisor from re-routing and causing multi-bubble responses.
+workflow.add_edge("SystemTools", "SystemWorker")  # Tool output returns to Worker
+workflow.add_edge("JournalWorker", END)
+workflow.add_edge("CalendarWorker", END)
+workflow.add_edge("GeneralWorker", END)
 
 def should_continue(state):
-    messages = state["messages"]
-    last_message = messages[-1]
+    """After SystemWorker runs: if the LLM made a native tool_call go to tools, else end."""
+    last_message = state["messages"][-1]
     if last_message.tool_calls:
         return "SystemTools"
-    return "Supervisor"
+    return END  # Go straight to END — answer is ready
 
 workflow.add_conditional_edges("SystemWorker", should_continue)
 

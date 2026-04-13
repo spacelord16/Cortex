@@ -17,24 +17,23 @@ parser = JsonOutputParser(pydantic_object=RouteSchema)
 
 system_prompt = (
     "You are the Supervisor of Cortex, an advanced personal operating system.\n"
-    "Your role is to route the user's request to the appropriate worker agent.\n"
-    " - SystemWorker: For computer stats, CPU, RAM, battery, process management.\n"
-    " - JournalWorker: For writing to or reading from the daily journal/notes.\n"
-    " - CalendarWorker: For scheduling, checking availability, or calendar events.\n"
-    " - GeneralWorker: For general chitchat (hello, hi), greetings, or questions not covered by others.\n"
+    "Your ONLY job is to output a JSON routing decision. Do not answer the user yourself.\n"
+    " - SystemWorker: CPU, RAM, battery, disk, processes, system stats.\n"
+    " - JournalWorker: Journal entries, notes, memories, past events.\n"
+    " - CalendarWorker: Schedule, calendar, availability.\n"
+    " - GeneralWorker: Greetings, small talk, or anything not covered above.\n"
+    " - FINISH: The user's request has already been answered. Choose this if the last message\n"
+    "   in the conversation is from a worker (not the user).\n"
     "\n"
-    "Given the conversation below, which agent should act next?\n"
-    " - If the user's request has been satisfied or answered by a worker, choose 'FINISH'.\n"
-    " - If the worker asked for clarification, choose 'FINISH' (so the user can reply).\n"
-    " - Only choose a worker if further action is truly needed.\n"
-    " Return a JSON object with a single key 'next' matching one of the options below.\n"
+    "CRITICAL RULE: If there is already a worker response in the conversation, output FINISH.\n"
+    "Never route to a worker twice for the same user request.\n"
+    "\n"
+    "Return ONLY valid JSON: {{\"next\": \"<choice>\"}}\n"
     "Options: {options}\n"
-    "\n"
     "{format_instructions}"
 )
 
-# options = ["FINISH"] + members
-options = members + ["FINISH"] # Order matters little
+options = members + ["FINISH"]
 
 prompt = ChatPromptTemplate.from_messages(
     [
@@ -42,13 +41,27 @@ prompt = ChatPromptTemplate.from_messages(
         MessagesPlaceholder(variable_name="messages"),
         (
             "user",
-            "Who should act next?",
+            "Who should act next? Reply with JSON only.",
         ),
     ]
 ).partial(options=str(options), format_instructions=parser.get_format_instructions())
 
+# Short acknowledgments that don't need any worker — route to FINISH instantly
+_FINISH_KEYWORDS = {"thanks", "thank you", "ok", "okay", "got it", "bye", "goodbye",
+                    "great", "perfect", "awesome", "nice", "cool", "noted", "sure"}
+
 def supervisor_node(state: AgentState):
+    # Fast-path: skip the LLM call for simple acknowledgments
+    messages = state.get("messages", [])
+    if messages:
+        last_content = messages[-1].content.strip().lower().rstrip("!.,")
+        if last_content in _FINISH_KEYWORDS or len(last_content.split()) <= 3 and any(
+            kw in last_content for kw in _FINISH_KEYWORDS
+        ):
+            return {"next": "FINISH"}
+
     llm = get_llm()
     supervisor_chain = prompt | llm | parser
     result = supervisor_chain.invoke(state)
     return result
+

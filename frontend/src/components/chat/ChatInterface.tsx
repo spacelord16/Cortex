@@ -117,6 +117,20 @@ export function ChatInterface() {
                 </div>
               </div>
             ))}
+            {/* Typing indicator — shown while the backend is thinking */}
+            {loading && (
+              <div className="flex gap-3">
+                <Avatar className="w-8 h-8">
+                  <AvatarFallback>AI</AvatarFallback>
+                </Avatar>
+                <div className="bg-muted p-3 rounded-lg flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground mr-1">Cortex is thinking</span>
+                  <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"/>
+                  <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"/>
+                  <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce"/>
+                </div>
+              </div>
+            )}
             <div ref={scrollRef} />
           </div>
         </ScrollArea>

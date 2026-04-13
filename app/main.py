@@ -44,16 +44,25 @@ async def chat(message: str):
     inputs = {"messages": [HumanMessage(content=message)]}
     
     async def event_generator():
-        # Stream the graph execution
-        async for event in graph.astream(inputs):
-            for key, value in event.items():
-                if key == "Supervisor":
-                   continue # Skip supervisor output for now
-                
-                # If it's a worker output, yield the content
-                if "messages" in value:
-                     last_msg = value["messages"][-1]
-                     yield json.dumps({"sender": key, "content": last_msg.content}) + "\n"
+        try:
+            # recursion_limit=6: Supervisor can route at most 2 worker calls before stopping
+            config = {"recursion_limit": 6}
+            async for event in graph.astream(inputs, config=config):
+                for key, value in event.items():
+                    if key == "Supervisor":
+                        continue
+                    if "messages" in value:
+                        last_msg = value["messages"][-1]
+                        content = last_msg.content if isinstance(last_msg.content, str) else str(last_msg.content)
+                        # Filter out raw internal tool-call JSON blobs (not meant for the user)
+                        if content.strip().startswith("```json") and "cortex_tool" in content:
+                            continue
+                        if not content.strip():
+                            continue
+                        yield json.dumps({"sender": key, "content": content}) + "\n"
+        except Exception as e:
+            logger.error(f"Graph execution error: {e}", exc_info=True)
+            yield json.dumps({"sender": "Cortex", "content": f"⚠️ Error: {str(e)}"}) + "\n"
 
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
