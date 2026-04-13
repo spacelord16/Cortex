@@ -177,3 +177,7 @@ state.json
 
 # Extra mds
 /extra_mds
+
+# Local data (ChromaDB vector store & private journal entries — never commit these)
+data/chroma_db/
+data/journal/

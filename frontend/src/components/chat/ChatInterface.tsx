@@ -44,46 +44,44 @@ export function ChatInterface() {
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
-      let assistantMsg: Message = { role: "assistant", content: "", sender: "Cortex" }
       
-      setMessages((prev) => [...prev, assistantMsg])
+      setMessages((prev) => [...prev, { role: "assistant", content: "", sender: "Cortex" }])
+
+      let buffer = ""
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         
-        const chunk = decoder.decode(value, { stream: true })
-        // The backend sends NDJSON lines. We need to parse each line.
-        // Chunk might contain multiple lines or partial lines.
-        // For simplicity assuming complete lines for now (needs proper buffering for robustness)
-        // Actually, let's buffer.
+        buffer += decoder.decode(value, { stream: true })
+        // Split by newlines to get individual JSON NDJSON lines
+        const lines = buffer.split("\n")
         
-        const lines = chunk.split("\n").filter(line => line.trim() !== "")
+        // The last element might be incomplete, so keep it in the buffer
+        buffer = lines.pop() || ""
+
         for (const line of lines) {
+           if (!line.trim()) continue
+           
            try {
              const json = JSON.parse(line)
-             // json is in format {sender: ..., content: ...}
-             // We want to append content to the last message
              setMessages((prev) => {
                 const newMsgs = [...prev]
                 const last = newMsgs[newMsgs.length - 1]
-                if (last.role === "assistant") {
-                  // This is simplified. In reality "sender" might change.
-                  // But for streaming token by token, standard LLM output:
-                  // Our backend sends full messages per worker step.
-                  // So we might get multiple full messages?
-                  // Wait, stream returns: {sender: "SystemWorker", content: "..."}
-                  // This is a COMPLETE message from a worker.
-                  // So we should add NEW messages for each event really.
-                  
-                  // If we already have an empty assistant placeholder, update it?
-                  // Actually, let's just append new messages.
+                
+                // If the last message is an empty assistant placeholder, update it.
+                // Otherwise, if it's a completely new node update, append a new message bubble.
+                if (last.role === "assistant" && last.content === "") {
                   return [...newMsgs.slice(0, -1), { role: "assistant", content: json.content, sender: json.sender }]
+                } else if (last.role === "assistant" && json.content.trim() !== "") {
+                  // Only append if it's not a weird empty string overwrite from the LLM
+                  return [...newMsgs, { role: "assistant", content: json.content, sender: json.sender }]
                 }
-                return [...newMsgs, { role: "assistant", content: json.content, sender: json.sender }]
+                
+                return newMsgs
              })
            } catch (e) {
-             console.error("Error parsing chunk", e)
+             console.error("Error parsing chunk", e, "Line:", line)
            }
         }
       }

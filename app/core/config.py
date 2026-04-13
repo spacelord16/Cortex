@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
     
     # LLM Choice
-    LLM_PROVIDER: Literal["openai", "huggingface", "ollama"] = "openai"
+    LLM_PROVIDER: Literal["openai", "huggingface", "ollama", "gemini"] = "openai"
     
     # OpenAI / Groq / LlamaAPI / Local
     LLM_API_KEY: str | None = None

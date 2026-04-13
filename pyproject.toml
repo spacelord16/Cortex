@@ -19,6 +19,7 @@ dependencies = [
     "langchain-community>=0.4.1",
     "huggingface-hub>=0.36.2",
     "sentence-transformers>=5.2.3",
+    "langchain-google-genai>=4.2.1",
 ]
 
 [build-system]
